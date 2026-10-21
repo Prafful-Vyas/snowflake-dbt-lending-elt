@@ -1,0 +1,41 @@
+version: 2
+models:
+  - name: dim_counterparty
+    description: SCD2 counterparty dimension (one row per version).
+    columns:
+      - name: counterparty_sk
+        data_tests: [unique, not_null]
+      - name: counterparty_id
+        data_tests: [not_null]
+  - name: dim_facility
+    columns:
+      - name: facility_id
+        data_tests: [unique, not_null]
+      - name: tenor_days
+        data_tests: [not_null]
+  - name: dim_date
+    columns:
+      - name: date_day
+        data_tests: [unique, not_null]
+  - name: fct_loan_transactions
+    description: One row per loan transaction, with GBP amounts and the counterparty version valid on the value date.
+    columns:
+      - name: txn_id
+        data_tests: [unique, not_null]
+      - name: counterparty_sk
+        description: Must always resolve (the first version is back-dated).
+        data_tests:
+          - not_null
+          - relationships: { to: ref('dim_counterparty'), field: counterparty_sk }
+      - name: amount_gbp
+        data_tests: [not_null]
+  - name: fct_facility_balance_daily
+    data_tests:
+      - unique_combination: { columns: [facility_id, balance_date] }
+    columns:
+      - name: facility_id
+        data_tests:
+          - relationships: { to: ref('dim_facility'), field: facility_id }
+  - name: mart_exposure_by_sector_rating
+    data_tests:
+      - unique_combination: { columns: [month_end, sector, internal_rating] }

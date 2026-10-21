@@ -1,0 +1,43 @@
+/* Autosys equivalent of airflow/dags/lending_elt.py, for estates scheduled by Autosys.
+   Load with: jil < autosys/lending_elt.jil                                          */
+
+insert_job: LND_ELT_BOX   job_type: BOX
+owner: svc_lending@etlhost
+date_conditions: 1
+days_of_week: mo,tu,we,th,fr
+start_times: "05:30"
+run_calendar: UK_BUSINESS_DAYS
+description: "Wholesale lending ELT: landing -> Snowflake -> dbt marts"
+alarm_if_fail: 1
+
+insert_job: LND_ELT_WAIT_LANDING   job_type: FW
+box_name: LND_ELT_BOX
+watch_file: /data/landing/lending/loan_transactions/_SUCCESS
+watch_interval: 300
+term_run_time: 240
+description: "Wait for the upstream landing marker (S3 synced to the ETL host)"
+
+insert_job: LND_ELT_FRESHNESS   job_type: CMD
+box_name: LND_ELT_BOX
+command: /opt/lending_elt/scripts/run_dbt.sh prod source freshness
+condition: s(LND_ELT_WAIT_LANDING)
+std_out_file: /var/log/lending_elt/$AUTO_JOB_NAME.out
+std_err_file: /var/log/lending_elt/$AUTO_JOB_NAME.err
+alarm_if_fail: 1
+
+insert_job: LND_ELT_SNAPSHOT   job_type: CMD
+box_name: LND_ELT_BOX
+command: /opt/lending_elt/scripts/run_dbt.sh prod snapshot
+condition: s(LND_ELT_FRESHNESS)
+std_out_file: /var/log/lending_elt/$AUTO_JOB_NAME.out
+std_err_file: /var/log/lending_elt/$AUTO_JOB_NAME.err
+alarm_if_fail: 1
+
+insert_job: LND_ELT_BUILD   job_type: CMD
+box_name: LND_ELT_BOX
+command: /opt/lending_elt/scripts/run_dbt.sh prod build --exclude resource_type:snapshot
+condition: s(LND_ELT_SNAPSHOT)
+std_out_file: /var/log/lending_elt/$AUTO_JOB_NAME.out
+std_err_file: /var/log/lending_elt/$AUTO_JOB_NAME.err
+max_run_alarm: 60
+alarm_if_fail: 1

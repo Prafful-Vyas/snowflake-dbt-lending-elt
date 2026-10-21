@@ -1,0 +1,39 @@
+name: lending_elt
+version: "1.0.0"
+config-version: 2
+profile: lending_elt
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  # Last business date covered by the balance models (the daily run passes {{ ds }}).
+  as_of_date: "2026-09-30"
+  # Re-process this many days of late-arriving transactions on each incremental run.
+  lookback_days: 3
+
+seeds:
+  lending_elt:
+    +schema: raw
+    raw_loan_transactions:
+      +column_types: { amount: "numeric(18,2)" }
+
+models:
+  lending_elt:
+    staging:
+      +materialized: view
+      +schema: staging
+    intermediate:
+      +materialized: view
+      +schema: intermediate
+    marts:
+      +materialized: table
+      +schema: marts
+
+snapshots:
+  lending_elt:
+    +target_schema: snapshots

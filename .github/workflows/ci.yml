@@ -1,0 +1,54 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  # Every PR: full build + tests on DuckDB (no warehouse cost), plus the two-day
+  # SCD2/incremental scenario.
+  duckdb:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install "dbt-core~=1.9.0" "dbt-duckdb~=1.9.0" duckdb
+      - run: dbt parse --profiles-dir profiles
+      - run: python scripts/verify_two_day.py
+      - run: bash -n scripts/run_dbt.sh
+      - name: DAG compiles
+        run: python -m py_compile airflow/dags/lending_elt.py
+
+  # Merge to main: deploy to Snowflake prod. The GitHub Environment "prod" holds the
+  # key-pair secret and can require approval. Slim CI: only modified models and their
+  # children are built, deferring to the last prod manifest for everything else.
+  deploy:
+    if: github.event_name == 'push'
+    needs: duckdb
+    runs-on: ubuntu-latest
+    environment: prod
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PRIVATE_KEY_PATH: ${{ github.workspace }}/sf_key.p8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install "dbt-core~=1.9.0" "dbt-snowflake~=1.9.0"
+      - run: printf '%s' "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" > sf_key.p8 && chmod 600 sf_key.p8
+      - name: fetch the manifest of the last successful prod deploy
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          last=$(gh run list --workflow ci.yml --branch main --status success --limit 1 --json databaseId -q '.[0].databaseId')
+          if [ -n "$last" ]; then gh run download "$last" --name prod-manifest --dir prod-state || true; fi
+      - name: build changed models in prod
+        run: |
+          if [ -f prod-state/manifest.json ]; then
+            dbt build --profiles-dir profiles --target prod --select state:modified+ --defer --state prod-state
+          else
+            dbt build --profiles-dir profiles --target prod
+          fi
+      - uses: actions/upload-artifact@v4
+        with: { name: prod-manifest, path: target/manifest.json }

@@ -1,0 +1,38 @@
+version: 2
+models:
+  - name: stg_counterparties
+    columns:
+      - name: counterparty_id
+        data_tests: [unique, not_null]
+      - name: internal_rating
+        data_tests:
+          - accepted_values: { values: [AAA, AA, A, BBB, BB, B, CCC, CC, C, D] }
+      - name: country
+        data_tests: [not_null]
+  - name: stg_facilities
+    columns:
+      - name: facility_id
+        data_tests: [unique, not_null]
+      - name: counterparty_id
+        data_tests:
+          - relationships: { to: ref('stg_counterparties'), field: counterparty_id }
+      - name: facility_type
+        data_tests:
+          - accepted_values: { values: [TERM_LOAN, REVOLVER] }
+      - name: currency
+        data_tests:
+          - accepted_values: { values: [GBP, USD, EUR] }
+  - name: stg_loan_transactions
+    columns:
+      - name: txn_id
+        data_tests: [unique, not_null]
+      - name: facility_id
+        data_tests:
+          - relationships: { to: ref('stg_facilities'), field: facility_id }
+      - name: txn_type
+        data_tests:
+          - accepted_values: { values: [DRAWDOWN, REPAYMENT, INTEREST, FEE] }
+  - name: stg_fx_rates
+    data_tests:
+      - unique_combination:
+          columns: [rate_date, from_currency, to_currency]

@@ -1,0 +1,15 @@
+version: 2
+sources:
+  - name: raw
+    # Snowflake: RAW.LENDING tables fed by Snowpipe from S3. Local: dbt seeds.
+    database: "{{ var('raw_database', target.database) }}"
+    schema: raw
+    loaded_at_field: loaded_at
+    tables:
+      - name: raw_counterparties
+      - name: raw_facilities
+      - name: raw_fx_rates
+      - name: raw_loan_transactions
+        freshness:
+          warn_after: { count: 26, period: hour }
+          error_after: { count: 50, period: hour }
