@@ -38,7 +38,7 @@ See [docs/data_model.md](docs/data_model.md) for the conceptual, logical and phy
 | `snowflake/03_iceberg_and_tasks.sql` | External volume + Snowflake-managed Iceberg table, and a serverless Task tree (freshness check → Iceberg publish) |
 | `airflow/dags/lending_elt.py` | S3 marker sensor → Snowpipe drained check → `dbt source freshness` → `snapshot` → `build` → `docs` |
 | `autosys/lending_elt.jil`, `scripts/run_dbt.sh` | The same flow as an Autosys box. The wrapper uses a lock, logs, retries transient failures only, and never retries test failures. |
-| `.github/workflows/ci.yml` | PR: DuckDB build + two-day scenario. Merge to main: Slim CI deploy to Snowflake prod (`state:modified+ --defer`) behind the `prod` environment |
+| `.github/workflows/ci.yml` | PR: DuckDB build + two-day scenario. Merge to main: Slim CI deploy to Snowflake prod (`state:modified+ --defer`) behind the `prod` environment. The deploy is opt-in: it runs only when the repository variable `SNOWFLAKE_DEPLOY_ENABLED` is `true` and the `prod` environment holds `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER` and `SNOWFLAKE_PRIVATE_KEY` |
 | `scripts/gen_seeds.py` | Synthetic counterparties, facilities, ~10.5k transactions and daily FX (seeds stand in for RAW locally) |
 
 ## Run locally

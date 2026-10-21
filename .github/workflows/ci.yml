@@ -23,8 +23,10 @@ jobs:
   # Merge to main: deploy to Snowflake prod. The GitHub Environment "prod" holds the
   # key-pair secret and can require approval. Slim CI: only modified models and their
   # children are built, deferring to the last prod manifest for everything else.
+  # Opt-in: set the repository variable SNOWFLAKE_DEPLOY_ENABLED=true once the
+  # Snowflake account and secrets exist; until then the job is skipped, not failed.
   deploy:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && vars.SNOWFLAKE_DEPLOY_ENABLED == 'true'
     needs: duckdb
     runs-on: ubuntu-latest
     environment: prod
